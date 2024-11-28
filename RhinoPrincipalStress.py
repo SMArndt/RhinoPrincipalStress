@@ -1,22 +1,24 @@
-from concurrent.futures import thread
+"""
+RhinoPrincipalStress.py - Copyright 2024 S.M.Arndt, Cavroc Pty Ltd
+Visit https://cavroc.com/ for more information on IUCM and StopeX
+
+This script is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software Foundation.
+
+geotechTools is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with geotechTools.
+If not, see <https://www.gnu.org/licenses/>.
+"""
+
 import System.Drawing
 import rhinoscriptsyntax as rs
 import scriptcontext as sc
 import Rhino
 import System
 import csv
-
-rgbBase = [0,0,0]
-
-def intcolor(rgbInc):
-    "increments global rgb variable with modulo 255"
-    
-    global rgbBase
-
-    for i in range(3): 
-        rgbBase[i] = (rgbBase[i] + rgbInc[i]) %255
-    red, green, blue = rgbBase
-    return System.Drawing.Color.FromArgb(red, green, blue)
 
 def map_to_color(value, min_value, max_value):
     """Map a scalar value to a rainbow color scale."""
@@ -93,59 +95,6 @@ def mapColorRenderIndex(value, min_value, max_value, N_intervals=20):
         material.CommitChanges()
 
     return material_index
-
-def XXXmapRenderColor(value, min_value, max_value, N_intervals=20):
-    """Map a scalar value to one of N discrete colors and create a corresponding render material.
-
-    Parameters:
-        value: float, the scalar value to map.
-        min_value: float, the minimum value in the range.
-        max_value: float, the maximum value in the range.
-        N_intervals: int, the number of discrete color intervals.
-
-    Returns:
-        material_name: str, the name of the material created/used.
-    """
-    # Clamp the value to the range [min_value, max_value]
-    value = max(min_value, min(max_value, value))
-    
-    # Map the value to a discrete interval
-    t = (value - min_value) / (max_value - min_value)  # Normalize to [0, 1]
-    interval = int(t * N_intervals)
-    interval = min(interval, N_intervals - 1)  # Ensure it doesn't exceed the last interval
-
-    # Define a color gradient (rainbow-like)
-    colors = [
-        (255, 0, 0),      # Red
-        (255, 128, 0),    # Orange
-        (255, 255, 0),    # Yellow
-        (0, 255, 0),      # Green
-        (0, 255, 255),    # Cyan
-        (0, 0, 255),      # Blue
-        (128, 0, 255),    # Violet
-    ]
-    
-    # Interpolate within the color gradient
-    gradient_index = interval * (len(colors) - 1) // (N_intervals - 1)
-    c1 = colors[gradient_index]
-    c2 = colors[min(gradient_index + 1, len(colors) - 1)]
-    blend = (t * N_intervals - interval)
-    color = tuple(int(c1[i] * (1 - blend) + c2[i] * blend) for i in range(3))
-
-    # Create or retrieve a render material for this color
-    material_name = f"Material_{interval}"
-    if not rs.MaterialNames() or material_name not in rs.MaterialNames():
-        material_index = rs.AddMaterialToObject(material_name)
-        rs.MaterialColor(material_index, Rhino.ApplicationSettings.System.Drawing.Color.FromArgb(*color))
-        rs.MaterialName(material_index, material_name)
-
-    return material_name
-
-def XXXassign_material_to_OLD(obj_id, material_name):
-    """Assign a render material to an object."""
-    material_index = rs.MaterialIndex(rs.MaterialNames().index(material_name))
-    rs.ObjectMaterialIndex(obj_id, material_index)
-    rs.ObjectMaterialSource(obj_id, 1)  # Set material source to 'material'
 
 def assign_material_to_object(obj_id, material_index):
     """Assign a render material to an object.
