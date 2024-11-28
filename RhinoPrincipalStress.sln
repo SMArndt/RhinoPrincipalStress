@@ -1,0 +1,23 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35431.28
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "RhinoPrincipalStress", "RhinoPrincipalStress.pyproj", "{C7E426EC-5DAC-4198-AC82-448DF50C2E94}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C7E426EC-5DAC-4198-AC82-448DF50C2E94}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C7E426EC-5DAC-4198-AC82-448DF50C2E94}.Release|Any CPU.ActiveCfg = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {01CABD5B-3886-4C99-BBA4-A8B9B2E1F201}
+	EndGlobalSection
+EndGlobal
