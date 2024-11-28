@@ -1,4 +1,5 @@
 from concurrent.futures import thread
+import System.Drawing
 import rhinoscriptsyntax as rs
 import scriptcontext as sc
 import Rhino
@@ -36,7 +37,130 @@ def map_to_color(value, min_value, max_value):
 
     return System.Drawing.Color.FromArgb(r, g, b)
 
-def create_arrow(base_point, direction, length, radius, color):
+def mapColorRenderIndex(value, min_value, max_value, N_intervals=20):
+    """Map a scalar value to one of N discrete colors and create a corresponding render material.
+
+    Parameters:
+        value: float, the scalar value to map.
+        min_value: float, the minimum value in the range.
+        max_value: float, the maximum value in the range.
+        N_intervals: int, the number of discrete color intervals.
+
+    Returns:
+        material_index: int, the index of the created/used material in the document.
+    """
+    # Clamp the value to the range [min_value, max_value]
+    value = max(min_value, min(max_value, value))
+    
+    # Map the value to a discrete interval
+    t = (value - min_value) / (max_value - min_value)  # Normalize to [0, 1]
+    interval = int(t * N_intervals)
+    interval = min(interval, N_intervals - 1)  # Ensure it doesn't exceed the last interval
+
+    # Define a color gradient (rainbow-like)
+    colors = [
+        (255, 0, 0),      # Red
+        (255, 128, 0),    # Orange
+        (255, 255, 0),    # Yellow
+        (0, 255, 0),      # Green
+        (0, 255, 255),    # Cyan
+        (0, 0, 255),      # Blue
+        (128, 0, 255),    # Violet
+    ]
+    
+    # Interpolate within the color gradient
+    gradient_index = interval * (len(colors) - 1) // (N_intervals - 1)
+    c1 = colors[gradient_index]
+    c2 = colors[min(gradient_index + 1, len(colors) - 1)]
+    blend = (t * N_intervals - interval)
+    color = System.Drawing.Color.FromArgb(
+        int(c1[0] * (1 - blend) + c2[0] * blend),
+        int(c1[1] * (1 - blend) + c2[1] * blend),
+        int(c1[2] * (1 - blend) + c2[2] * blend)
+    )
+
+    # Material name based on the interval
+    material_name = f"Material_{interval}"
+
+    # Check if the material already exists
+    material_index = sc.doc.Materials.Find(material_name, True)
+    if material_index == -1:
+        # Create a new material
+        material_index = sc.doc.Materials.Add()
+        material = sc.doc.Materials[material_index]
+        material.Name = material_name
+        material.DiffuseColor = color
+        material.CommitChanges()
+
+    return material_index
+
+def XXXmapRenderColor(value, min_value, max_value, N_intervals=20):
+    """Map a scalar value to one of N discrete colors and create a corresponding render material.
+
+    Parameters:
+        value: float, the scalar value to map.
+        min_value: float, the minimum value in the range.
+        max_value: float, the maximum value in the range.
+        N_intervals: int, the number of discrete color intervals.
+
+    Returns:
+        material_name: str, the name of the material created/used.
+    """
+    # Clamp the value to the range [min_value, max_value]
+    value = max(min_value, min(max_value, value))
+    
+    # Map the value to a discrete interval
+    t = (value - min_value) / (max_value - min_value)  # Normalize to [0, 1]
+    interval = int(t * N_intervals)
+    interval = min(interval, N_intervals - 1)  # Ensure it doesn't exceed the last interval
+
+    # Define a color gradient (rainbow-like)
+    colors = [
+        (255, 0, 0),      # Red
+        (255, 128, 0),    # Orange
+        (255, 255, 0),    # Yellow
+        (0, 255, 0),      # Green
+        (0, 255, 255),    # Cyan
+        (0, 0, 255),      # Blue
+        (128, 0, 255),    # Violet
+    ]
+    
+    # Interpolate within the color gradient
+    gradient_index = interval * (len(colors) - 1) // (N_intervals - 1)
+    c1 = colors[gradient_index]
+    c2 = colors[min(gradient_index + 1, len(colors) - 1)]
+    blend = (t * N_intervals - interval)
+    color = tuple(int(c1[i] * (1 - blend) + c2[i] * blend) for i in range(3))
+
+    # Create or retrieve a render material for this color
+    material_name = f"Material_{interval}"
+    if not rs.MaterialNames() or material_name not in rs.MaterialNames():
+        material_index = rs.AddMaterialToObject(material_name)
+        rs.MaterialColor(material_index, Rhino.ApplicationSettings.System.Drawing.Color.FromArgb(*color))
+        rs.MaterialName(material_index, material_name)
+
+    return material_name
+
+def XXXassign_material_to_OLD(obj_id, material_name):
+    """Assign a render material to an object."""
+    material_index = rs.MaterialIndex(rs.MaterialNames().index(material_name))
+    rs.ObjectMaterialIndex(obj_id, material_index)
+    rs.ObjectMaterialSource(obj_id, 1)  # Set material source to 'material'
+
+def assign_material_to_object(obj_id, material_index):
+    """Assign a render material to an object.
+
+    Parameters:
+        obj_id: GUID of the Rhino object.
+        material_index: int, the index of the material in the document.
+    """
+    obj = sc.doc.Objects.Find(obj_id)
+    if obj:
+        obj.Attributes.MaterialIndex = material_index
+        obj.Attributes.MaterialSource = Rhino.DocObjects.ObjectMaterialSource.MaterialFromObject
+        obj.CommitChanges()
+
+def create_arrow(base_point, direction, length, radius, color, matIndex):
     """Create a double-pointed arrow centered at base_point and aligned with the direction vector."""
     # Normalize the direction vector
     direction = rs.VectorUnitize(direction)
@@ -55,8 +179,9 @@ def create_arrow(base_point, direction, length, radius, color):
 
     # Create the cylinder (shaft)
     shaft = rs.AddCylinder(cylinder_plane, rs.Distance(cylinder_start, cylinder_end), radius, cap=True)
-    print(color)
+
     rs.ObjectColor(shaft, color)
+    assign_material_to_object(shaft, matIndex)
 
     # Calculate cone bases and tips for outward pointing cones
     cone1_base = arrow1_start  # Base at the end of the cylinder
@@ -68,9 +193,11 @@ def create_arrow(base_point, direction, length, radius, color):
     # Create the cones
     cone1 = rs.AddCone(rs.PlaneFromNormal(cone1_base, -direction), cone_length, radius * 2, cap=True)
     rs.ObjectColor(cone1, color)
+    assign_material_to_object(cone1, matIndex)
 
     cone2 = rs.AddCone(rs.PlaneFromNormal(cone2_base, direction), cone_length, radius * 2, cap=True)
     rs.ObjectColor(cone2, color)
+    assign_material_to_object(cone2, matIndex)
 
     # Group the geometry
     group = rs.AddGroup()
@@ -116,15 +243,18 @@ def visualize_principal_stresses_from_file(filepath):
             color1 = map_to_color(S1, min_stress, max_stress)
             color2 = map_to_color(S2, min_stress, max_stress)
             color3 = map_to_color(S3, min_stress, max_stress)
-
+            rcolor1 = mapColorRenderIndex(S1, min_stress, max_stress)
+            rcolor2 = mapColorRenderIndex(S2, min_stress, max_stress)
+            rcolor3 = mapColorRenderIndex(S3, min_stress, max_stress)
+            
             # Create arrows
             base_point = (x, y, z)
-            create_arrow(base_point, SN1, abs(S1/SP_factor), 0.2, color1)
-            create_arrow(base_point, SN2, abs(S2/SP_factor), 0.2, color2)
-            create_arrow(base_point, SN3, abs(S3/SP_factor), 0.2, color3)
+            create_arrow(base_point, SN1, abs(S1/SP_factor), 0.2, color1, rcolor1)
+            create_arrow(base_point, SN2, abs(S2/SP_factor), 0.2, color2, rcolor2)
+            create_arrow(base_point, SN3, abs(S3/SP_factor), 0.2, color3, rcolor3)
 
 if __name__ == "__main__":
     # Path to your file
     filepath = r"C:\Rhino3D\Principal Stress Visualisation\StressData.csv"
-    filepath = r"C:\Rhino3D\Principal Stress Visualisation\Gwalia_Grid_Red100p.csv"
+    filepath = r"C:\Rhino3D\Principal Stress Visualisation\Gwalia_Grid_Red500p.csv"
     visualize_principal_stresses_from_file(filepath)
